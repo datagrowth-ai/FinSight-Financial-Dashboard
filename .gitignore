@@ -1,0 +1,11 @@
+# Python virtual environment (200-500MB — too large to upload)
+venv/
+__pycache__/
+*.pyc
+
+# OS system files
+.DS_Store
+Thumbs.db
+
+# Jupyter checkpoints (if you add notebooks later)
+.ipynb_checkpoints/

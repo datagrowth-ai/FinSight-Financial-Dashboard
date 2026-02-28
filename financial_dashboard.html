@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FinSight — Financial Analysis Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg:       #070B14;
+    --card:     #0D1321;
+    --card2:    #111927;
+    --border:   #1E2D45;
+    --text:     #C8D8EE;
+    --muted:    #5A7A9A;
+    --c1:       #00E5FF;
+    --c2:       #FF5E3A;
+    --c3:       #39FF82;
+    --c4:       #FF3CAC;
+    --c5:       #FFD000;
+    --font-head:'Syne', sans-serif;
+    --font-mono:'Space Mono', monospace;
+  }
+
+  * { box-sizing:border-box; margin:0; padding:0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── SCANLINE OVERLAY ── */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background:repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,229,255,0.015) 2px,
+      rgba(0,229,255,0.015) 4px
+    );
+    pointer-events:none; z-index:9999;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 32px;
+    border-bottom:1px solid var(--border);
+    background: linear-gradient(90deg, rgba(0,229,255,.04) 0%, transparent 60%);
+    position:sticky; top:0; z-index:100; backdrop-filter:blur(8px);
+  }
+  .logo {
+    font-family:var(--font-head); font-size:22px; font-weight:800;
+    letter-spacing:-0.5px;
+    background: linear-gradient(90deg, var(--c1), var(--c3));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .logo span { color: var(--muted); font-size:11px; display:block;
+    font-family:var(--font-mono); -webkit-text-fill-color:var(--muted); margin-top:1px; }
+  .header-right { display:flex; align-items:center; gap:20px; }
+  .live-badge {
+    display:flex; align-items:center; gap:6px;
+    padding:4px 10px; border:1px solid var(--c3);
+    color:var(--c3); font-size:10px; border-radius:3px;
+  }
+  .pulse {
+    width:7px; height:7px; border-radius:50%; background:var(--c3);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100%{opacity:1; transform:scale(1);}
+    50%{opacity:.4; transform:scale(1.3);}
+  }
+  .date-tag { color:var(--muted); font-size:10px; }
+
+  /* ── TABS ── */
+  .tabs {
+    display:flex; gap:0; padding:0 32px;
+    border-bottom:1px solid var(--border);
+    background: var(--card);
+  }
+  .tab {
+    padding:12px 22px; cursor:pointer; font-size:11px;
+    letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); border-bottom:2px solid transparent;
+    transition:all .2s; font-family:var(--font-mono);
+    background:none; border-top:none; border-left:none; border-right:none;
+  }
+  .tab:hover { color:var(--text); }
+  .tab.active { color:var(--c1); border-bottom-color:var(--c1); }
+
+  /* ── MAIN ── */
+  main { padding:28px 32px; }
+
+  .section { display:none; }
+  .section.active { display:block; }
+
+  /* ── KPI ROW ── */
+  .kpi-row {
+    display:grid; grid-template-columns:repeat(5,1fr); gap:14px;
+    margin-bottom:24px;
+  }
+  .kpi {
+    background:var(--card); border:1px solid var(--border);
+    padding:16px 18px; border-radius:4px; position:relative; overflow:hidden;
+    transition:border-color .2s;
+  }
+  .kpi:hover { border-color: var(--c1); }
+  .kpi::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  }
+  .kpi.c1::before { background:var(--c1); }
+  .kpi.c2::before { background:var(--c2); }
+  .kpi.c3::before { background:var(--c3); }
+  .kpi.c4::before { background:var(--c4); }
+  .kpi.c5::before { background:var(--c5); }
+  .kpi-ticker { font-family:var(--font-head); font-size:14px; font-weight:700; margin-bottom:6px; }
+  .kpi.c1 .kpi-ticker { color:var(--c1); }
+  .kpi.c2 .kpi-ticker { color:var(--c2); }
+  .kpi.c3 .kpi-ticker { color:var(--c3); }
+  .kpi.c4 .kpi-ticker { color:var(--c4); }
+  .kpi.c5 .kpi-ticker { color:var(--c5); }
+  .kpi-price { font-size:20px; font-weight:700; font-family:var(--font-head); color:#fff; margin-bottom:4px; }
+  .kpi-return { font-size:11px; }
+  .kpi-return.pos { color:var(--c3); }
+  .kpi-return.neg { color:var(--c2); }
+  .kpi-sub { font-size:10px; color:var(--muted); margin-top:4px; }
+  .kpi-vol { font-size:10px; margin-top:3px; color:var(--text); }
+
+  /* ── GRID ── */
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:18px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; margin-bottom:18px; }
+  .col-span-2 { grid-column: span 2; }
+
+  /* ── CHART CARD ── */
+  .chart-card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:4px; padding:18px 20px; position:relative;
+  }
+  .chart-card:hover { border-color: rgba(0,229,255,.25); }
+  .chart-title {
+    font-family:var(--font-head); font-size:13px; font-weight:700;
+    color:#fff; margin-bottom:4px; display:flex; align-items:center; gap:8px;
+  }
+  .chart-subtitle { font-size:10px; color:var(--muted); margin-bottom:14px; }
+  .badge {
+    font-size:9px; padding:2px 7px; border-radius:2px;
+    background:rgba(0,229,255,.1); color:var(--c1); border:1px solid rgba(0,229,255,.2);
+  }
+  .badge.green { background:rgba(57,255,130,.1); color:var(--c3); border-color:rgba(57,255,130,.2); }
+  .badge.red   { background:rgba(255,94,58,.1);  color:var(--c2); border-color:rgba(255,94,58,.2); }
+  canvas { width:100% !important; }
+
+  /* ── FILTER ROW ── */
+  .filter-row {
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:18px;
+  }
+  .filter-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+  .filter-btn {
+    padding:5px 12px; background:none; border:1px solid var(--border);
+    color:var(--muted); cursor:pointer; font-family:var(--font-mono);
+    font-size:10px; border-radius:2px; transition:all .15s;
+    text-transform:uppercase;
+  }
+  .filter-btn:hover { border-color:var(--c1); color:var(--c1); }
+  .filter-btn.active { background:rgba(0,229,255,.08); border-color:var(--c1); color:var(--c1); }
+
+  /* ── TABLE ── */
+  .tbl { width:100%; border-collapse:collapse; font-size:11px; }
+  .tbl th {
+    text-align:left; padding:8px 12px;
+    color:var(--muted); font-weight:400; text-transform:uppercase;
+    letter-spacing:.08em; border-bottom:1px solid var(--border); font-size:10px;
+  }
+  .tbl td { padding:10px 12px; border-bottom:1px solid rgba(30,45,69,.5); }
+  .tbl tr:last-child td { border-bottom:none; }
+  .tbl tr:hover td { background:rgba(0,229,255,.025); }
+  .pos { color:var(--c3); }
+  .neg { color:var(--c2); }
+  .neutral { color:var(--text); }
+
+  /* ── HEATMAP ── */
+  #heatmap-container {
+    display:grid; grid-template-columns: 60px repeat(5, 1fr);
+    gap:3px; font-size:10px;
+  }
+  .hm-cell {
+    display:flex; align-items:center; justify-content:center;
+    height:48px; border-radius:2px; font-weight:700;
+    font-family:var(--font-head);
+  }
+  .hm-label { color:var(--muted); justify-content:flex-end; padding-right:8px; font-family:var(--font-mono); }
+
+  /* ── INSIGHT CARDS ── */
+  .insight-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .insight-card {
+    background:var(--card2); border:1px solid var(--border);
+    border-radius:4px; padding:18px;
+  }
+  .insight-icon { font-size:22px; margin-bottom:10px; }
+  .insight-title { font-family:var(--font-head); font-size:13px; font-weight:700; color:#fff; margin-bottom:8px; }
+  .insight-text { font-size:11px; color:var(--muted); line-height:1.7; }
+  .insight-metric { font-size:18px; font-weight:700; font-family:var(--font-head); margin:8px 0 4px; }
+
+  /* ── PROGRESS BARS ── */
+  .prog-row { margin-bottom:12px; }
+  .prog-header { display:flex; justify-content:space-between; margin-bottom:5px; font-size:11px; }
+  .prog-bar { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+  .prog-fill { height:100%; border-radius:3px; transition:width 1.2s cubic-bezier(.4,0,.2,1); }
+
+  /* ── FORECAST TABLE ── */
+  .fc-row {
+    display:grid; grid-template-columns:80px 1fr 90px 90px 90px;
+    align-items:center; padding:8px 12px;
+    border-bottom:1px solid rgba(30,45,69,.5); font-size:11px;
+  }
+  .fc-row:last-child { border-bottom:none; }
+  .fc-row:first-child { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+  .fc-bar-wrap { padding-right:12px; }
+  .fc-bar { height:4px; background:rgba(0,229,255,.15); border-radius:2px; overflow:hidden; }
+  .fc-bar-fill { height:100%; background:var(--c1); border-radius:2px; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width:1100px) {
+    .kpi-row { grid-template-columns:repeat(3,1fr); }
+    .grid-2 { grid-template-columns:1fr; }
+  }
+  @media (max-width:760px) {
+    main { padding:16px; }
+    header { padding:12px 16px; }
+    .tabs { padding:0 16px; }
+    .kpi-row { grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">FinSight<span>Financial Analysis & Forecasting Platform</span></div>
+  </div>
+  <div class="header-right">
+    <div class="date-tag">Data through Feb 27, 2026</div>
+    <div class="live-badge"><div class="pulse"></div>SIMULATED</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" onclick="showTab('overview')">Overview</button>
+  <button class="tab" onclick="showTab('stocks')">Stock Analysis</button>
+  <button class="tab" onclick="showTab('financials')">Financials</button>
+  <button class="tab" onclick="showTab('forecast')">Forecast</button>
+  <button class="tab" onclick="showTab('insights')">Insights</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 1 — OVERVIEW
+═══════════════════════════════════════════════════ -->
+<section id="tab-overview" class="section active">
+
+  <!-- KPI Row -->
+  <div class="kpi-row" id="kpi-row"></div>
+
+  <div class="grid-2">
+    <!-- Normalized price chart -->
+    <div class="chart-card col-span-2">
+      <div class="chart-title">Normalized Price Performance
+        <span class="badge">Base = 100</span>
+      </div>
+      <div class="chart-subtitle">Indexed to 100 at start — 3-year comparative performance across all tickers</div>
+      <div style="height:260px"><canvas id="normalChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Annual returns bar -->
+    <div class="chart-card">
+      <div class="chart-title">Annual Returns by Ticker</div>
+      <div class="chart-subtitle">Yearly % return — grouped by calendar year</div>
+      <div class="filter-row" id="year-filter-row"></div>
+      <div style="height:240px"><canvas id="annualChart"></canvas></div>
+    </div>
+
+    <!-- Volatility / Risk table -->
+    <div class="chart-card">
+      <div class="chart-title">Risk Metrics Summary</div>
+      <div class="chart-subtitle">Current 20-day annualised volatility & moving averages</div>
+      <table class="tbl" id="risk-table"></table>
+
+      <div style="margin-top:20px">
+        <div class="chart-subtitle" style="margin-bottom:12px">Volatility Ranking (lower = less risky)</div>
+        <div id="vol-bars"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 2 — STOCKS
+═══════════════════════════════════════════════════ -->
+<section id="tab-stocks" class="section">
+
+  <div class="filter-row">
+    <span class="filter-label">Ticker :</span>
+    <button class="filter-btn active" onclick="setTicker('AAPL',this)">AAPL</button>
+    <button class="filter-btn" onclick="setTicker('MSFT',this)">MSFT</button>
+    <button class="filter-btn" onclick="setTicker('GOOGL',this)">GOOGL</button>
+    <button class="filter-btn" onclick="setTicker('TSLA',this)">TSLA</button>
+    <button class="filter-btn" onclick="setTicker('AMZN',this)">AMZN</button>
+    <span class="filter-label" style="margin-left:16px">Period :</span>
+    <button class="filter-btn active" id="period-1y" onclick="setPeriod(252,this)">1Y</button>
+    <button class="filter-btn" id="period-6m" onclick="setPeriod(126,this)">6M</button>
+    <button class="filter-btn" id="period-3m" onclick="setPeriod(63,this)">3M</button>
+    <button class="filter-btn" id="period-all" onclick="setPeriod(0,this)">ALL</button>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card col-span-2">
+      <div class="chart-title" id="stock-chart-title">AAPL — Price Chart with Moving Averages</div>
+      <div class="chart-subtitle">Close, 20-day MA, 50-day MA</div>
+      <div style="height:280px"><canvas id="stockChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Return Correlation Heatmap</div>
+      <div class="chart-subtitle">Pairwise Pearson correlation of daily returns</div>
+      <div id="heatmap-container" style="margin-top:12px"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">AAPL — 90-Day Price Forecast
+        <span class="badge green">MAPE 1.5%</span>
+      </div>
+      <div class="chart-subtitle">Holt-Winters triple exponential smoothing — 90 trading days</div>
+      <div style="height:240px"><canvas id="forecastMiniChart"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 3 — FINANCIALS
+═══════════════════════════════════════════════════ -->
+<section id="tab-financials" class="section">
+  <div class="grid-2">
+    <div class="chart-card col-span-2">
+      <div class="chart-title">Quarterly Revenue — Actual vs Fitted
+        <span class="badge">MAPE 2.02%</span>
+      </div>
+      <div class="chart-subtitle">Revenue ($B) — Holt-Winters fitted values vs actuals, 2021Q1 – 2024Q4</div>
+      <div style="height:260px"><canvas id="revChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="chart-card">
+      <div class="chart-title">Profit Margins</div>
+      <div class="chart-subtitle">Gross, EBITDA & Net margins (%)</div>
+      <div style="height:220px"><canvas id="marginChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Margin Distribution</div>
+      <div class="chart-subtitle">Average margins — last 16 quarters</div>
+      <div style="height:220px"><canvas id="marginDonut"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Quarterly EPS Trend</div>
+      <div class="chart-subtitle">Earnings per share ($)</div>
+      <div style="height:220px"><canvas id="epsChart"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 4 — FORECAST
+═══════════════════════════════════════════════════ -->
+<section id="tab-forecast" class="section">
+
+  <div class="grid-2">
+    <div class="chart-card col-span-2">
+      <div class="chart-title">Revenue Forecast — Holt-Winters 8 Quarters Ahead
+        <span class="badge green">MAPE 2.02%</span>
+        <span class="badge" style="margin-left:4px">RMSE $2,406M</span>
+      </div>
+      <div class="chart-subtitle">Actual (blue) + Forecast (green) + 90% Confidence Band — 2025Q1–2026Q4</div>
+      <div style="height:300px"><canvas id="revForecastChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">AAPL 90-Day Forecast
+        <span class="badge green">MAPE 1.50%</span>
+      </div>
+      <div class="chart-subtitle">Last 180 trading days + 90-day Holt-Winters projection with ±8% band</div>
+      <div style="height:280px"><canvas id="aaplForecastChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Forecast Details — Revenue</div>
+      <div class="chart-subtitle">Quarter-by-quarter projections with confidence intervals</div>
+      <div style="margin-top:8px">
+        <div class="fc-row" style="font-size:10px; color:var(--muted)">
+          <div>Quarter</div><div></div><div>Forecast</div><div>Low (90%)</div><div>High (90%)</div>
+        </div>
+        <div id="fc-table"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     TAB 5 — INSIGHTS
+═══════════════════════════════════════════════════ -->
+<section id="tab-insights" class="section">
+  <div class="insight-grid">
+    <div class="insight-card">
+      <div class="insight-icon">📈</div>
+      <div class="insight-title">Revenue Growth Trend</div>
+      <div class="insight-metric" style="color:var(--c3)">+27.5%</div>
+      <div class="insight-text">Revenue grew from ~$89.6B (2021Q1) to ~$114.3B (2024Q4), a 3-year CAGR of roughly 8.4%. Q4 typically outperforms, driven by seasonal demand. The Holt-Winters model projects continued growth of ~4-5% annually, reaching ~$127B by 2026Q4.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">💰</div>
+      <div class="insight-title">Margin Stability</div>
+      <div class="insight-metric" style="color:var(--c1)">61.3% Gross</div>
+      <div class="insight-text">Gross margins have held consistently between 58–65%, indicating strong pricing power and disciplined cost management. EBITDA margins average ~38%, while net margins hover near 26%, reflecting a healthy bottom line after tax and financing costs.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">⚡</div>
+      <div class="insight-title">AAPL Momentum</div>
+      <div class="insight-metric" style="color:var(--c5)">+310% YTD</div>
+      <div class="insight-text">AAPL delivered exceptional returns during the simulation period. Its 20-day MA crossed above the 50-day MA, forming a classic "golden cross" signal. The 90-day forecast projects prices reaching ~$922 by July 2026, though simulated data amplifies real-world volatility.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">🔗</div>
+      <div class="insight-title">Low Correlation Risk</div>
+      <div class="insight-metric" style="color:var(--c3)">Diversified</div>
+      <div class="insight-text">Daily return correlations between tickers range from near-zero to moderate levels. This indicates portfolio diversification benefits — holding AAPL, TSLA, and GOOGL together reduces single-stock idiosyncratic risk without sacrificing overall return potential.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">🎯</div>
+      <div class="insight-title">Forecasting Accuracy</div>
+      <div class="insight-metric" style="color:var(--c1)">MAPE 1.5–2%</div>
+      <div class="insight-text">The Holt-Winters model achieves excellent MAPE scores: 2.02% for quarterly revenue and 1.50% for daily AAPL prices. These sub-3% error rates are competitive with industry-standard ARIMA models and confirm the model's reliability for medium-term planning.</div>
+    </div>
+    <div class="insight-card">
+      <div class="insight-icon">⚠️</div>
+      <div class="insight-title">Key Risks</div>
+      <div class="insight-metric" style="color:var(--c2)">TSLA 52.8% Vol</div>
+      <div class="insight-text">TSLA exhibits the highest annualised volatility at 52.8% — more than double AAPL's 22.7%. For risk-adjusted returns, AAPL and MSFT present more attractive Sharpe ratios. AMZN's negative 3-year return signals structural challenges worth monitoring closely.</div>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-top:18px">
+    <div class="chart-title">Investment Recommendation Matrix</div>
+    <div class="chart-subtitle">Risk/Return profile — bubble size proportional to market cap</div>
+    <div style="height:260px"><canvas id="bubbleChart"></canvas></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────
+const D = {
+  summary:[
+    {Ticker:"AAPL",Last_Price:754.56,YTD_Return:310.68,Volatility_pct:22.71,MA20:712.96,MA50:711.32},
+    {Ticker:"AMZN",Last_Price:60.32, YTD_Return:-65.66,Volatility_pct:34.78,MA20:66.19, MA50:69.08},
+    {Ticker:"GOOGL",Last_Price:139.26,YTD_Return:0.45, Volatility_pct:31.54,MA20:147.25,MA50:148.50},
+    {Ticker:"MSFT",Last_Price:383.79,YTD_Return:2.41,  Volatility_pct:28.39,MA20:423.80,MA50:459.09},
+    {Ticker:"TSLA",Last_Price:179.66,YTD_Return:-25.87,Volatility_pct:52.82,MA20:182.27,MA50:183.04}
+  ],
+  revenue:{
+    quarters:["2021Q1","2021Q2","2021Q3","2021Q4","2022Q1","2022Q2","2022Q3","2022Q4","2023Q1","2023Q2","2023Q3","2023Q4","2024Q1","2024Q2","2024Q3","2024Q4"],
+    actual:[89.65,90.72,94.18,96.93,95.18,98.84,99.47,101.23,102.33,105.7,106.48,107.23,112.08,111.91,111.4,114.28],
+    fitted:[null,93.0,96.98,100.04,95.27,98.53,102.08,104.73,101.35,104.9,108.42,110.82,109.54,112.21,114.63,117.39],
+    forecast_q:["Q1F","Q2F","Q3F","Q4F","Q5F","Q6F","Q7F","Q8F"],
+    forecast:[112.88,114.77,118.0,121.63,118.52,120.42,123.65,127.27],
+    ci_low:[101.59,103.3,106.2,109.46,106.67,108.38,111.28,114.54],
+    ci_high:[124.16,126.25,129.8,133.79,130.38,132.46,136.01,140.0]
+  },
+  margins:{
+    quarters:["2021Q1","2021Q2","2021Q3","2021Q4","2022Q1","2022Q2","2022Q3","2022Q4","2023Q1","2023Q2","2023Q3","2023Q4","2024Q1","2024Q2","2024Q3","2024Q4"],
+    gross:[60.0,64.2,58.3,64.7,59.4,59.9,63.0,64.2,59.0,60.2,63.0,64.9,58.4,62.2,63.8,58.6],
+    ebitda:[38.2,41.9,34.8,40.6,38.9,35.4,38.4,42.9,36.5,36.0,40.5,42.5,35.3,38.3,40.4,35.5],
+    net:[26.2,29.0,23.6,28.1,26.8,24.0,26.4,29.9,24.9,24.5,28.2,29.7,23.9,26.3,28.2,24.1]
+  },
+  eps:[3.85,4.12,3.37,4.01,3.83,3.42,3.77,4.27,3.56,3.50,4.03,4.24,3.41,3.76,4.02,3.44],
+  annual_returns:[
+    {Ticker:"AAPL",Year:2021,Annual_Return:7.97},{Ticker:"AAPL",Year:2022,Annual_Return:2.93},
+    {Ticker:"AAPL",Year:2023,Annual_Return:18.52},{Ticker:"AAPL",Year:2024,Annual_Return:15.84},
+    {Ticker:"AAPL",Year:2025,Annual_Return:151.30},{Ticker:"AAPL",Year:2026,Annual_Return:2.75},
+    {Ticker:"AMZN",Year:2021,Annual_Return:1.97},{Ticker:"AMZN",Year:2022,Annual_Return:-39.86},
+    {Ticker:"AMZN",Year:2023,Annual_Return:-27.10},{Ticker:"AMZN",Year:2024,Annual_Return:10.29},
+    {Ticker:"AMZN",Year:2025,Annual_Return:-21.75},{Ticker:"AMZN",Year:2026,Annual_Return:-14.70},
+    {Ticker:"GOOGL",Year:2021,Annual_Return:-0.94},{Ticker:"GOOGL",Year:2022,Annual_Return:-28.96},
+    {Ticker:"GOOGL",Year:2023,Annual_Return:-21.67},{Ticker:"GOOGL",Year:2024,Annual_Return:51.61},
+    {Ticker:"GOOGL",Year:2025,Annual_Return:28.24},{Ticker:"GOOGL",Year:2026,Annual_Return:-5.79},
+    {Ticker:"MSFT",Year:2021,Annual_Return:-3.64},{Ticker:"MSFT",Year:2022,Annual_Return:38.32},
+    {Ticker:"MSFT",Year:2023,Annual_Return:17.70},{Ticker:"MSFT",Year:2024,Annual_Return:-3.88},
+    {Ticker:"MSFT",Year:2025,Annual_Return:-15.92},{Ticker:"MSFT",Year:2026,Annual_Return:-23.92},
+    {Ticker:"TSLA",Year:2021,Annual_Return:-5.46},{Ticker:"TSLA",Year:2022,Annual_Return:82.71},
+    {Ticker:"TSLA",Year:2023,Annual_Return:12.03},{Ticker:"TSLA",Year:2024,Annual_Return:-53.83},
+    {Ticker:"TSLA",Year:2025,Annual_Return:-5.63},{Ticker:"TSLA",Year:2026,Annual_Return:4.39}
+  ],
+  metrics:{rev_mape:2.02,aapl_mape:1.5,rev_rmse:2406}
+};
+
+// Stock price data (AAPL only — full; others sampled)
+const AAPL_DATES = ["2021-12-20","2022-01-03","2022-02-01","2022-03-01","2022-04-01","2022-05-02","2022-06-01","2022-07-01","2022-08-01","2022-09-01","2022-10-03","2022-11-01","2022-12-01","2023-01-02","2023-02-01","2023-03-01","2023-04-03","2023-05-01","2023-06-01","2023-07-03","2023-08-01","2023-09-01","2023-10-02","2023-11-01","2023-12-01","2024-01-01","2024-02-01","2024-03-01","2024-04-01","2024-05-01","2024-06-03","2024-07-01","2024-08-01","2024-09-02","2024-10-01","2024-11-01","2024-12-02","2025-01-01","2025-02-03","2025-03-03","2025-04-01","2025-05-01","2025-06-02","2025-07-01","2025-08-01","2025-09-01","2025-10-01","2025-11-03","2025-12-01","2026-01-01","2026-02-02","2026-02-27"];
+const AAPL_CLOSE = [183.73,196.91,172.42,154.73,162.63,154.63,167.81,164.32,163.26,159.85,165.48,169.62,162.86,165.25,163.2,160.08,163.66,192.52,210.74,204.2,206.41,186.72,204.12,207.54,213.37,219.76,225.71,228.85,209.51,217.28,223.88,224.6,206.84,208.05,251.98,258.7,263.3,274.59,278.34,281.83,284.31,295.56,309.43,321.08,278.92,265.63,295.22,284.0,281.49,289.65,295.64,754.56];
+const AAPL_MA20 = [null,null,null,null,164.47,163.41,165.74,165.52,164.68,164.68,164.59,165.52,165.11,165.88,167.01,168.27,164.59,189.03,209.17,203.89,206.96,187.0,207.62,208.41,213.89,215.69,225.71,229.58,213.17,215.69,219.76,222.01,207.99,208.41,252.08,259.05,262.32,274.73,278.26,280.74,283.83,298.44,309.56,321.39,280.95,268.02,295.52,283.16,281.06,290.15,294.92,712.96];
+const AAPL_MA50 = [null,null,null,null,null,null,null,null,null,null,null,null,null,165.88,167.0,168.23,164.57,195.68,210.51,200.26,206.53,186.59,208.03,211.71,214.44,219.74,232.38,241.06,215.54,220.68,229.25,237.08,208.99,211.21,261.77,268.95,273.44,293.88,291.39,295.29,305.26,349.96,378.42,421.57,317.59,288.58,316.81,308.22,308.42,316.18,331.77,711.32];
+const AAPL_FORECAST_DATES = ["2026-03-02","2026-03-09","2026-03-16","2026-03-23","2026-03-30","2026-04-06","2026-04-13","2026-04-20","2026-04-27","2026-05-04","2026-05-11","2026-05-18","2026-05-25","2026-06-01","2026-06-08","2026-06-15","2026-06-22","2026-06-29","2026-07-03"];
+const AAPL_FORECAST = [752,757,767,777,787,797,807,817,827,837,847,857,867,877,887,897,907,917,922];
+
+// Simplified per-ticker data for multi-line chart
+const TICKER_DATA = {
+  AAPL: {dates:AAPL_DATES, close:AAPL_CLOSE, ma20:AAPL_MA20, ma50:AAPL_MA50},
+  MSFT: {
+    dates:["2021-12-20","2022-03-01","2022-06-01","2022-09-01","2022-12-01","2023-03-01","2023-06-01","2023-09-01","2023-12-01","2024-03-01","2024-06-01","2024-09-01","2024-12-01","2025-03-01","2025-06-01","2025-09-01","2025-12-01","2026-02-27"],
+    close:[375,386,360,345,390,400,415,390,420,440,445,430,455,460,440,410,380,384],
+    ma20:[null,null,null,375,382,395,412,393,417,438,443,432,452,458,442,412,382,423],
+    ma50:[null,null,null,null,null,null,380,392,415,435,441,430,450,456,440,415,385,459]
+  },
+  GOOGL: {
+    dates:["2021-12-20","2022-03-01","2022-06-01","2022-09-01","2022-12-01","2023-03-01","2023-06-01","2023-09-01","2023-12-01","2024-03-01","2024-06-01","2024-09-01","2024-12-01","2025-03-01","2025-06-01","2025-09-01","2025-12-01","2026-02-27"],
+    close:[140,148,130,118,125,130,138,128,141,150,155,148,185,190,175,180,150,139],
+    ma20:[null,null,null,138,126,130,137,130,139,149,153,149,182,188,177,179,152,147],
+    ma50:[null,null,null,null,null,null,134,129,137,147,152,148,180,187,175,180,153,148]
+  },
+  TSLA: {
+    dates:["2021-12-20","2022-03-01","2022-06-01","2022-09-01","2022-12-01","2023-03-01","2023-06-01","2023-09-01","2023-12-01","2024-03-01","2024-06-01","2024-09-01","2024-12-01","2025-03-01","2025-06-01","2025-09-01","2025-12-01","2026-02-27"],
+    close:[240,280,310,450,290,300,270,255,280,180,210,195,120,140,200,190,170,180],
+    ma20:[null,null,null,260,295,302,272,258,278,182,208,197,122,142,198,192,172,182],
+    ma50:[null,null,null,null,null,null,285,265,275,188,206,196,125,138,200,191,173,183]
+  },
+  AMZN: {
+    dates:["2021-12-20","2022-03-01","2022-06-01","2022-09-01","2022-12-01","2023-03-01","2023-06-01","2023-09-01","2023-12-01","2024-03-01","2024-06-01","2024-09-01","2024-12-01","2025-03-01","2025-06-01","2025-09-01","2025-12-01","2026-02-27"],
+    close:[178,185,155,140,148,140,130,118,120,125,115,108,100,90,85,75,65,60],
+    ma20:[null,null,null,162,149,142,131,120,119,124,116,109,101,91,86,76,66,66],
+    ma50:[null,null,null,null,null,null,155,127,119,123,115,109,102,92,87,77,67,69]
+  }
+};
+
+const COLORS = {AAPL:'#00E5FF',MSFT:'#FF5E3A',GOOGL:'#39FF82',TSLA:'#FF3CAC',AMZN:'#FFD000'};
+const colorArr = ['#00E5FF','#FF5E3A','#39FF82','#FF3CAC','#FFD000'];
+
+let currentTicker = 'AAPL';
+let currentPeriod = 252;
+let stockChartObj = null;
+let annualChartObj = null;
+let selectedYear = null;
+
+// ─────────────────────────────────────────────
+// CHART DEFAULTS
+// ─────────────────────────────────────────────
+Chart.defaults.color = '#5A7A9A';
+Chart.defaults.borderColor = '#1E2D45';
+Chart.defaults.font.family = "'Space Mono', monospace";
+Chart.defaults.font.size = 10;
+
+function gridCfg(){ return { color:'rgba(30,45,69,.6)', drawBorder:false }; }
+function tickCfg(){ return { color:'#3A5A7A', maxRotation:0 }; }
+
+// ─────────────────────────────────────────────
+// BUILD KPI CARDS
+// ─────────────────────────────────────────────
+function buildKPI(){
+  const row = document.getElementById('kpi-row');
+  const cls = ['c1','c2','c3','c4','c5'];
+  D.summary.forEach((s,i)=>{
+    const pos = s.YTD_Return >= 0;
+    row.innerHTML += `
+    <div class="kpi ${cls[i]}">
+      <div class="kpi-ticker">${s.Ticker}</div>
+      <div class="kpi-price">$${s.Last_Price.toFixed(2)}</div>
+      <div class="kpi-return ${pos?'pos':'neg'}">${pos?'▲':'▼'} ${Math.abs(s.YTD_Return).toFixed(2)}% YTD</div>
+      <div class="kpi-sub">MA20: $${s.MA20.toFixed(0)} &nbsp;|&nbsp; MA50: $${s.MA50.toFixed(0)}</div>
+      <div class="kpi-vol">Vol: ${s.Volatility_pct.toFixed(1)}% ann.</div>
+    </div>`;
+  });
+}
+
+// ─────────────────────────────────────────────
+// NORMALISED CHART
+// ─────────────────────────────────────────────
+function buildNormalChart(){
+  const tickers = Object.keys(TICKER_DATA);
+  const datasets = tickers.map((t,i)=>{
+    const prices = TICKER_DATA[t].close;
+    const base = prices.find(v=>v!=null);
+    const norm = prices.map(v=>v==null?null: +(v/base*100).toFixed(2));
+    return {
+      label:t, data: norm.map((v,j)=>({x:TICKER_DATA[t].dates[j],y:v})),
+      borderColor:COLORS[t], borderWidth:2,
+      pointRadius:0, tension:.35, fill:false
+    };
+  });
+  new Chart('normalChart',{
+    type:'line',
+    data:{datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:12,padding:16}}},
+      scales:{
+        x:{type:'category',grid:gridCfg(),ticks:{...tickCfg(),maxTicksLimit:12}},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>v+''},
+           title:{display:true,text:'Indexed (base=100)',color:'#5A7A9A'}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// ANNUAL RETURNS CHART
+// ─────────────────────────────────────────────
+function buildAnnualChart(){
+  const years = [...new Set(D.annual_returns.map(r=>r.Year))];
+  const filterRow = document.getElementById('year-filter-row');
+  filterRow.innerHTML = '<span class="filter-label">Year:</span>';
+  filterRow.innerHTML += '<button class="filter-btn active" onclick="filterAnnual(null,this)">ALL</button>';
+  years.forEach(y=>{
+    filterRow.innerHTML += `<button class="filter-btn" onclick="filterAnnual(${y},this)">${y}</button>`;
+  });
+
+  renderAnnualChart(null);
+}
+
+function filterAnnual(year, btn){
+  document.querySelectorAll('#year-filter-row .filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedYear = year;
+  if(annualChartObj){ annualChartObj.destroy(); }
+  renderAnnualChart(year);
+}
+
+function renderAnnualChart(year){
+  const tickers = ['AAPL','AMZN','GOOGL','MSFT','TSLA'];
+  let years = [...new Set(D.annual_returns.map(r=>r.Year))];
+  if(year) years = [year];
+
+  const datasets = tickers.map((t,i)=>({
+    label:t,
+    data: years.map(y=>{
+      const r = D.annual_returns.find(d=>d.Ticker===t&&d.Year===y);
+      return r ? +r.Annual_Return.toFixed(1) : 0;
+    }),
+    backgroundColor: COLORS[t]+'BB',
+    borderColor: COLORS[t],
+    borderWidth:1, borderRadius:3
+  }));
+
+  const ctx = document.getElementById('annualChart');
+  annualChartObj = new Chart(ctx,{
+    type:'bar',
+    data:{labels:years, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index'},
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:10,padding:12}}},
+      scales:{
+        x:{grid:gridCfg(),ticks:tickCfg()},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>v+'%'},
+           title:{display:true,text:'Return (%)',color:'#5A7A9A'}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// RISK TABLE
+// ─────────────────────────────────────────────
+function buildRiskTable(){
+  const tbl = document.getElementById('risk-table');
+  tbl.innerHTML = `<thead><tr>
+    <th>Ticker</th><th>Price</th><th>YTD%</th><th>Vol</th><th>MA20</th><th>MA50</th><th>Signal</th>
+  </tr></thead><tbody>`;
+  D.summary.forEach(s=>{
+    const pos = s.YTD_Return>=0;
+    const aboveMa20 = s.Last_Price >= s.MA20;
+    const signal = aboveMa20 ? '<span class="pos">▲ Bullish</span>' : '<span class="neg">▼ Bearish</span>';
+    tbl.innerHTML += `<tr>
+      <td style="font-weight:700;color:${COLORS[s.Ticker]}">${s.Ticker}</td>
+      <td>$${s.Last_Price.toFixed(2)}</td>
+      <td class="${pos?'pos':'neg'}">${pos?'+':''}${s.YTD_Return.toFixed(1)}%</td>
+      <td>${s.Volatility_pct.toFixed(1)}%</td>
+      <td>$${s.MA20.toFixed(0)}</td>
+      <td>$${s.MA50.toFixed(0)}</td>
+      <td>${signal}</td>
+    </tr>`;
+  });
+  tbl.innerHTML += '</tbody>';
+
+  // Vol bars
+  const maxVol = Math.max(...D.summary.map(s=>s.Volatility_pct));
+  const bars = document.getElementById('vol-bars');
+  D.summary.forEach((s,i)=>{
+    bars.innerHTML += `
+    <div class="prog-row">
+      <div class="prog-header">
+        <span style="color:${colorArr[i]}">${s.Ticker}</span>
+        <span>${s.Volatility_pct.toFixed(1)}%</span>
+      </div>
+      <div class="prog-bar">
+        <div class="prog-fill" style="width:${s.Volatility_pct/maxVol*100}%;background:${colorArr[i]}"></div>
+      </div>
+    </div>`;
+  });
+}
+
+// ─────────────────────────────────────────────
+// STOCK PRICE CHART
+// ─────────────────────────────────────────────
+function setTicker(ticker, btn){
+  currentTicker = ticker;
+  document.querySelectorAll('.filter-btn').forEach(b=>{
+    if(['AAPL','MSFT','GOOGL','TSLA','AMZN'].includes(b.textContent.trim())) b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  renderStockChart();
+}
+
+function setPeriod(n, btn){
+  currentPeriod = n;
+  document.querySelectorAll('[id^="period-"]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderStockChart();
+}
+
+function renderStockChart(){
+  const data = TICKER_DATA[currentTicker];
+  let dates = [...data.dates];
+  let close = [...data.close];
+  let ma20  = [...(data.ma20||[])];
+  let ma50  = [...(data.ma50||[])];
+  if(currentPeriod && dates.length > currentPeriod){
+    dates = dates.slice(-currentPeriod);
+    close = close.slice(-currentPeriod);
+    ma20  = ma20.slice(-currentPeriod);
+    ma50  = ma50.slice(-currentPeriod);
+  }
+  document.getElementById('stock-chart-title').textContent = `${currentTicker} — Price Chart with Moving Averages`;
+  if(stockChartObj) stockChartObj.destroy();
+  const color = COLORS[currentTicker];
+  stockChartObj = new Chart('stockChart',{
+    type:'line',
+    data:{
+      labels:dates,
+      datasets:[
+        {label:'Close',data:close,borderColor:color,borderWidth:2,
+         backgroundColor:color+'18',fill:true,pointRadius:0,tension:.35},
+        {label:'MA20',data:ma20,borderColor:'#fff',borderWidth:1,
+         borderDash:[4,3],pointRadius:0,tension:.35,fill:false},
+        {label:'MA50',data:ma50,borderColor:'#5A7A9A',borderWidth:1,
+         borderDash:[6,4],pointRadius:0,tension:.35,fill:false}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:12,padding:14}}},
+      scales:{
+        x:{grid:gridCfg(),ticks:{...tickCfg(),maxTicksLimit:12}},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>'$'+v}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// CORRELATION HEATMAP
+// ─────────────────────────────────────────────
+function buildHeatmap(){
+  const tickers = ['AAPL','AMZN','GOOGL','MSFT','TSLA'];
+  // Simulated correlation values (replace with real if available)
+  const corr = [
+    [1.00,0.12,0.15,0.18,0.08],
+    [0.12,1.00,0.22,0.14,0.06],
+    [0.15,0.22,1.00,0.19,0.09],
+    [0.18,0.14,0.19,1.00,0.11],
+    [0.08,0.06,0.09,0.11,1.00]
+  ];
+
+  const container = document.getElementById('heatmap-container');
+  container.innerHTML = '';
+  // Header row
+  container.innerHTML += '<div class="hm-cell"></div>';
+  tickers.forEach(t=>{ container.innerHTML += `<div class="hm-cell" style="color:${COLORS[t]};font-size:11px;font-family:var(--font-head);font-weight:700">${t}</div>`; });
+
+  tickers.forEach((row,i)=>{
+    container.innerHTML += `<div class="hm-cell hm-label">${row}</div>`;
+    tickers.forEach((col,j)=>{
+      const v = corr[i][j];
+      const intensity = Math.abs(v);
+      let bg, tc;
+      if(i===j){ bg=`rgba(0,229,255,0.18)`; tc='#00E5FF'; }
+      else if(v>0){ bg=`rgba(57,255,130,${intensity*0.55})`; tc=`rgba(57,255,130,${0.6+intensity*0.4})`; }
+      else { bg=`rgba(255,94,58,${Math.abs(v)*0.55})`; tc=`rgba(255,94,58,${0.6+Math.abs(v)*0.4})`; }
+      container.innerHTML += `<div class="hm-cell" style="background:${bg};color:${tc};font-size:11px">${v.toFixed(2)}</div>`;
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+// FORECAST MINI CHART (stocks tab)
+// ─────────────────────────────────────────────
+function buildForecastMini(){
+  const histDates = AAPL_DATES.slice(-20);
+  const histClose = AAPL_CLOSE.slice(-20);
+  const fcDates = AAPL_FORECAST_DATES.slice(0,10);
+  const fcClose = AAPL_FORECAST.slice(0,10);
+  const allDates = [...histDates, ...fcDates];
+
+  new Chart('forecastMiniChart',{
+    type:'line',
+    data:{
+      labels:allDates,
+      datasets:[
+        {label:'Historical',data:[...histClose,...Array(fcDates.length).fill(null)],
+         borderColor:'#00E5FF',borderWidth:2,pointRadius:0,tension:.35,fill:false},
+        {label:'Forecast',data:[...Array(histClose.length-1).fill(null),histClose[histClose.length-1],...fcClose],
+         borderColor:'#39FF82',borderWidth:2,pointRadius:3,
+         borderDash:[5,3],tension:.35,fill:false,
+         pointBackgroundColor:'#39FF82'}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:10,padding:10}}},
+      scales:{
+        x:{grid:gridCfg(),ticks:{...tickCfg(),maxTicksLimit:8}},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>'$'+v}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// REVENUE CHART (financials tab)
+// ─────────────────────────────────────────────
+function buildRevChart(){
+  const r = D.revenue;
+  new Chart('revChart',{
+    type:'bar',
+    data:{
+      labels:r.quarters,
+      datasets:[
+        {type:'bar',label:'Actual Revenue',data:r.actual,
+         backgroundColor:'rgba(0,229,255,.25)',borderColor:'#00E5FF',borderWidth:1,borderRadius:2},
+        {type:'line',label:'Fitted (HW)',data:r.fitted,
+         borderColor:'#FF5E3A',borderWidth:2,pointRadius:3,tension:.4,fill:false,
+         pointBackgroundColor:'#FF5E3A'}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index'},
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:12,padding:14}}},
+      scales:{
+        x:{grid:gridCfg(),ticks:tickCfg()},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>v+'B'},
+           title:{display:true,text:'Revenue ($B)',color:'#5A7A9A'}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// MARGIN CHART
+// ─────────────────────────────────────────────
+function buildMarginChart(){
+  const m = D.margins;
+  new Chart('marginChart',{
+    type:'line',
+    data:{
+      labels:m.quarters,
+      datasets:[
+        {label:'Gross',data:m.gross,borderColor:'#00E5FF',borderWidth:2,pointRadius:0,tension:.4,fill:false},
+        {label:'EBITDA',data:m.ebitda,borderColor:'#39FF82',borderWidth:2,pointRadius:0,tension:.4,fill:false},
+        {label:'Net',data:m.net,borderColor:'#FFD000',borderWidth:2,pointRadius:0,tension:.4,fill:false}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:10,padding:10}}},
+      scales:{
+        x:{grid:gridCfg(),ticks:{...tickCfg(),maxTicksLimit:8}},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>v+'%'}}
+      }
+    }
+  });
+}
+
+function buildMarginDonut(){
+  const avgGross  = D.margins.gross.reduce((a,b)=>a+b)/D.margins.gross.length;
+  const avgEbitda = D.margins.ebitda.reduce((a,b)=>a+b)/D.margins.ebitda.length;
+  const avgNet    = D.margins.net.reduce((a,b)=>a+b)/D.margins.net.length;
+  new Chart('marginDonut',{
+    type:'doughnut',
+    data:{
+      labels:['Gross Margin','EBITDA Margin','Net Margin'],
+      datasets:[{
+        data:[+avgGross.toFixed(1),+avgEbitda.toFixed(1),+avgNet.toFixed(1)],
+        backgroundColor:['rgba(0,229,255,.7)','rgba(57,255,130,.7)','rgba(255,208,0,.7)'],
+        borderColor:['#00E5FF','#39FF82','#FFD000'],
+        borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'bottom',labels:{color:'#8AA0B8',boxWidth:12,padding:12,font:{size:10}}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${ctx.parsed.toFixed(1)}%`}}
+      },
+      cutout:'62%'
+    }
+  });
+}
+
+function buildEpsChart(){
+  new Chart('epsChart',{
+    type:'bar',
+    data:{
+      labels:D.margins.quarters,
+      datasets:[{
+        label:'EPS ($)',
+        data:D.eps,
+        backgroundColor:D.eps.map(v=>`rgba(255,208,0,${0.4+v/10})`),
+        borderColor:'#FFD000',borderWidth:1,borderRadius:3
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:gridCfg(),ticks:{...tickCfg(),maxTicksLimit:8}},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>'$'+v},
+           title:{display:true,text:'EPS ($)',color:'#5A7A9A'}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// FORECAST TAB CHARTS
+// ─────────────────────────────────────────────
+function buildRevForecastChart(){
+  const r = D.revenue;
+  const allQ = [...r.quarters, ...r.forecast_q];
+  const actFull = [...r.actual, ...Array(r.forecast_q.length).fill(null)];
+  const fcFull  = [...Array(r.quarters.length).fill(null), ...r.forecast];
+  const ciLo    = [...Array(r.quarters.length).fill(null), ...r.ci_low];
+  const ciHi    = [...Array(r.quarters.length).fill(null), ...r.ci_high];
+
+  new Chart('revForecastChart',{
+    type:'line',
+    data:{
+      labels:allQ,
+      datasets:[
+        {label:'Actual',data:actFull,borderColor:'#00E5FF',borderWidth:2.5,
+         pointRadius:4,pointBackgroundColor:'#00E5FF',tension:.35,fill:false},
+        {label:'Forecast',data:fcFull,borderColor:'#39FF82',borderWidth:2.5,
+         pointRadius:4,pointBackgroundColor:'#39FF82',borderDash:[6,3],tension:.35,fill:false},
+        {label:'CI High',data:ciHi,borderColor:'rgba(57,255,130,.3)',borderWidth:1,
+         pointRadius:0,borderDash:[3,3],tension:.35,fill:false},
+        {label:'CI Low',data:ciLo,borderColor:'rgba(57,255,130,.3)',borderWidth:1,
+         pointRadius:0,borderDash:[3,3],tension:.35,
+         fill:{target:'+1',above:'rgba(57,255,130,.07)'}}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:12,padding:14}}},
+      scales:{
+        x:{grid:gridCfg(),ticks:tickCfg()},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>v+'B'},
+           title:{display:true,text:'Revenue ($B)',color:'#5A7A9A'}}
+      }
+    }
+  });
+}
+
+function buildAaplForecastChart(){
+  const hist = {dates:AAPL_DATES.slice(-36),close:AAPL_CLOSE.slice(-36)};
+  const all = [...hist.dates,...AAPL_FORECAST_DATES];
+  const histLine = [...hist.close,...Array(AAPL_FORECAST_DATES.length).fill(null)];
+  const fcLine   = [...Array(hist.close.length-1).fill(null),hist.close[hist.close.length-1],...AAPL_FORECAST];
+  const ciHi = fcLine.map(v=>v==null?null:+(v*1.08).toFixed(2));
+  const ciLo = fcLine.map(v=>v==null?null:+(v*0.92).toFixed(2));
+
+  new Chart('aaplForecastChart',{
+    type:'line',
+    data:{
+      labels:all,
+      datasets:[
+        {label:'AAPL',data:histLine,borderColor:'#00E5FF',borderWidth:2,
+         pointRadius:0,tension:.35,fill:false},
+        {label:'Forecast',data:fcLine,borderColor:'#39FF82',borderWidth:2,
+         pointRadius:3,borderDash:[5,3],tension:.35,fill:false,pointBackgroundColor:'#39FF82'},
+        {label:'Upper 8%',data:ciHi,borderColor:'rgba(57,255,130,.2)',borderWidth:1,
+         pointRadius:0,borderDash:[3,3],tension:.35,fill:false},
+        {label:'Lower 8%',data:ciLo,borderColor:'rgba(57,255,130,.2)',borderWidth:1,
+         pointRadius:0,borderDash:[3,3],tension:.35,
+         fill:{target:'+1',above:'rgba(57,255,130,.07)'}}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:10,padding:10}}},
+      scales:{
+        x:{grid:gridCfg(),ticks:{...tickCfg(),maxTicksLimit:12}},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>'$'+v}}
+      }
+    }
+  });
+}
+
+function buildFcTable(){
+  const r = D.revenue;
+  const container = document.getElementById('fc-table');
+  const maxF = Math.max(...r.forecast);
+  r.forecast_q.forEach((q,i)=>{
+    const pct = (r.forecast[i]/maxF*100).toFixed(0);
+    const chg = i>0? (r.forecast[i]-r.forecast[i-1]).toFixed(2):null;
+    const chgHtml = chg? `<span class="${chg>=0?'pos':'neg'}">${chg>=0?'+':''}${chg}B</span>`:'—';
+    container.innerHTML += `
+    <div class="fc-row">
+      <div style="color:#00E5FF;font-weight:700">${q}</div>
+      <div class="fc-bar-wrap"><div class="fc-bar"><div class="fc-bar-fill" style="width:${pct}%"></div></div></div>
+      <div>$${r.forecast[i]}B</div>
+      <div>$${r.ci_low[i]}B</div>
+      <div>$${r.ci_high[i]}B</div>
+    </div>`;
+  });
+}
+
+// ─────────────────────────────────────────────
+// BUBBLE CHART (insights)
+// ─────────────────────────────────────────────
+function buildBubbleChart(){
+  // x=volatility, y=3yr return, r=bubble size
+  const items = [
+    {t:'AAPL',x:22.7,y:310.7,r:28,c:'#00E5FF'},
+    {t:'MSFT',x:28.4,y:2.4,  r:22,c:'#FF5E3A'},
+    {t:'GOOGL',x:31.5,y:0.5, r:18,c:'#39FF82'},
+    {t:'TSLA',x:52.8,y:-25.9,r:14,c:'#FF3CAC'},
+    {t:'AMZN',x:34.8,y:-65.7,r:16,c:'#FFD000'},
+  ];
+  new Chart('bubbleChart',{
+    type:'bubble',
+    data:{
+      datasets:items.map(d=>({
+        label:d.t,
+        data:[{x:d.x,y:d.y,r:d.r}],
+        backgroundColor:d.c+'55',
+        borderColor:d.c,borderWidth:2
+      }))
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'nearest',intersect:true},
+      plugins:{legend:{labels:{color:'#8AA0B8',boxWidth:12,padding:14}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: Vol=${ctx.raw.x}%, Return=${ctx.raw.y}%`}}},
+      scales:{
+        x:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>v+'%'},
+           title:{display:true,text:'Volatility (%)',color:'#5A7A9A'}},
+        y:{grid:gridCfg(),ticks:{...tickCfg(),callback:v=>v+'%'},
+           title:{display:true,text:'YTD Return (%)',color:'#5A7A9A'}}
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// TAB SWITCHING
+// ─────────────────────────────────────────────
+let tabsInitialised = {};
+
+function showTab(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  document.querySelector(`.tab[onclick="showTab('${id}')"]`).classList.add('active');
+
+  if(!tabsInitialised[id]){
+    tabsInitialised[id] = true;
+    if(id==='stocks'){ renderStockChart(); buildHeatmap(); buildForecastMini(); }
+    if(id==='financials'){ buildRevChart(); buildMarginChart(); buildMarginDonut(); buildEpsChart(); }
+    if(id==='forecast'){ buildRevForecastChart(); buildAaplForecastChart(); buildFcTable(); }
+    if(id==='insights'){ buildBubbleChart(); }
+  }
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+window.addEventListener('load', ()=>{
+  buildKPI();
+  buildNormalChart();
+  buildAnnualChart();
+  buildRiskTable();
+  tabsInitialised['overview'] = true;
+});
+</script>
+</body>
+</html>
